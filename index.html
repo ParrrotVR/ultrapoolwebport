@@ -91,8 +91,8 @@ body {
 	z-index: 1;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
-<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index2.icon.png" />
+<link rel="apple-touch-icon" href="index2.apple-touch-icon.png"/>
 
 	</head>
 	<body>
@@ -105,18 +105,18 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
+			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index2.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
 
 		<script>
 const CHUNKED_FILES = {
-	"index.pck": [
-		"index.pck.part000","index.pck.part001","index.pck.part002","index.pck.part003","index.pck.part004",
-		"index.pck.part005","index.pck.part006","index.pck.part007","index.pck.part008","index.pck.part009"
+	"index2.pck": [
+		"index2.pck.part000","index2.pck.part001","index2.pck.part002","index2.pck.part003","index2.pck.part004",
+		"index2.pck.part005","index2.pck.part006","index2.pck.part007","index2.pck.part008","index2.pck.part009"
 	],
-	"index.wasm": ["index.wasm.part000","index.wasm.part001"]
+	"index2.wasm": ["index2.wasm.part000","index2.wasm.part001"]
 };
 
 (function () {
@@ -136,18 +136,13 @@ const CHUNKED_FILES = {
 		const dir = slash >= 0 ? stripped.slice(0, slash + 1) : '';
 		const fileName = slash >= 0 ? stripped.slice(slash + 1) : stripped;
 		const parts = CHUNKED_FILES[fileName];
-
-		if (!parts) {
-			return nativeFetch(resource, init);
-		}
+		if (!parts) return nativeFetch(resource, init);
 
 		const buffers = [];
 		let total = 0;
 		for (const part of parts) {
 			const partResp = await nativeFetch(dir + part, init);
-			if (!partResp.ok) {
-				throw new Error(`Missing chunk ${part} for ${fileName}`);
-			}
+			if (!partResp.ok) throw new Error(`Missing chunk ${part} for ${fileName}`);
 			const buf = await partResp.arrayBuffer();
 			total += buf.byteLength;
 			buffers.push(new Uint8Array(buf));
@@ -171,9 +166,9 @@ const CHUNKED_FILES = {
 	};
 }());
 		</script>
-		<script src="index.js"></script>
+		<script src="index2.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":222337000,"index.wasm":35739700},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index2","experimentalVK":false,"fileSizes":{"index2.pck":227754604,"index2.wasm":35739700},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
