@@ -3,6 +3,7 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<script src="coi-serviceworker.js"></script>
 		<title>Ultrapool</title>
 		<style>
 html, body, #canvas {
@@ -92,9 +93,9 @@ body {
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
-		<script src="coi-serviceworker.js"></script>
-		<script src="godot-chunk-loader.js"></script>
-		<script src="index.js"></script>
+
+	</head>
+	<body>
 		<canvas id="canvas">
 			Your browser does not support the canvas tag.
 		</canvas>
@@ -109,6 +110,68 @@ body {
 			<div id="status-notice"></div>
 		</div>
 
+		<script>
+const CHUNKED_FILES = {
+	"index.pck": [
+		"index.pck.part000","index.pck.part001","index.pck.part002","index.pck.part003","index.pck.part004",
+		"index.pck.part005","index.pck.part006","index.pck.part007","index.pck.part008","index.pck.part009"
+	],
+	"index.wasm": ["index.wasm.part000","index.wasm.part001"]
+};
+
+(function () {
+	const nativeFetch = window.fetch.bind(window);
+
+	function toUrlString(resource) {
+		if (typeof resource === 'string') return resource;
+		if (resource instanceof URL) return resource.toString();
+		if (resource && typeof resource.url === 'string') return resource.url;
+		return '';
+	}
+
+	window.fetch = async function (resource, init) {
+		const requestUrl = toUrlString(resource);
+		const stripped = requestUrl.split('#')[0].split('?')[0];
+		const slash = stripped.lastIndexOf('/');
+		const dir = slash >= 0 ? stripped.slice(0, slash + 1) : '';
+		const fileName = slash >= 0 ? stripped.slice(slash + 1) : stripped;
+		const parts = CHUNKED_FILES[fileName];
+
+		if (!parts) {
+			return nativeFetch(resource, init);
+		}
+
+		const buffers = [];
+		let total = 0;
+		for (const part of parts) {
+			const partResp = await nativeFetch(dir + part, init);
+			if (!partResp.ok) {
+				throw new Error(`Missing chunk ${part} for ${fileName}`);
+			}
+			const buf = await partResp.arrayBuffer();
+			total += buf.byteLength;
+			buffers.push(new Uint8Array(buf));
+		}
+
+		const merged = new Uint8Array(total);
+		let offset = 0;
+		for (const b of buffers) {
+			merged.set(b, offset);
+			offset += b.byteLength;
+		}
+
+		return new Response(merged, {
+			status: 200,
+			statusText: 'OK',
+			headers: {
+				'Content-Type': 'application/octet-stream',
+				'Content-Length': String(total),
+			},
+		});
+	};
+}());
+		</script>
+		<script src="index.js"></script>
 		<script>
 const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":222337000,"index.wasm":35739700},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
@@ -198,89 +261,21 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	} else {
 		setStatusMode('progress');
-		
-		const chunkLoader = new GodotChunkLoader();
-		
-		async function startGame() {
-			try {
-				setStatusNotice('Setting up game files...');
-				
-				// Load both PCK and WASM files first
-				console.log('Loading PCK file...');
-				const pckData = await chunkLoader.loadChunkedFile('index.manifest.json', (progress, message) => {
-					console.log(message);
-				});
-
-				console.log('Loading WASM file...');
-				const wasmData = await chunkLoader.loadChunkedFile('index.wasm.manifest.json', (progress, message) => {
-					console.log(message);
-				});
-
-				console.log('Files loaded, setting up interception...');
-				
-				// Set up fetch interception BEFORE starting the game
-				const originalFetch = window.fetch;
-				window.fetch = function(url, options) {
-					console.log('Fetch called for:', url);
-					if (url.endsWith('index.pck')) {
-						console.log('Intercepting PCK file request');
-						return Promise.resolve(new Response(pckData, {
-							status: 200,
-							headers: { 'Content-Type': 'application/octet-stream' }
-						}));
-					}
-					if (url.endsWith('index.wasm')) {
-						console.log('Intercepting WASM file request');
-						return Promise.resolve(new Response(wasmData, {
-							status: 200,
-							headers: { 'Content-Type': 'application/wasm' }
-						}));
-					}
-					return originalFetch(url, options);
-				};
-
-				// Test the interception
-				console.log('Testing fetch interception...');
-				window.fetch('index.wasm').then(response => {
-					console.log('Test WASM fetch successful, size:', response.arrayBuffer().then(b => console.log('Size:', b.byteLength)));
-				}).catch(e => console.log('Test fetch error:', e));
-
-				// Also inject PCK into Godot's file system
-				const originalPreRun = engine.preRun || (() => {});
-				engine.preRun = () => {
-					if (typeof engine.FS !== 'undefined' && engine.FS.writeFile) {
-						engine.FS.writeFile('/index.pck', pckData);
-						console.log('PCK file injected into Godot file system');
-					}
-					originalPreRun();
-				};
-				
-				console.log('Starting game...');
-				setStatusNotice('Starting game...');
-				engine.startGame({
-					'onProgress': function (current, total) {
-						if (current > 0 && total > 0) {
-							statusProgress.value = current;
-							statusProgress.max = total;
-							setStatusNotice(`Loading: ${Math.round((current/total) * 100)}%`);
-						} else {
-							statusProgress.removeAttribute('value');
-							statusProgress.removeAttribute('max');
-						}
-					},
-				}).then(() => {
-					setStatusMode('hidden');
-				}, displayFailureNotice);
-			} catch (error) {
-				console.error('Error setting up game:', error);
-				displayFailureNotice('Failed to setup game: ' + error.message);
-			}
-		}
-		
-		startGame();
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					statusProgress.value = current;
+					statusProgress.max = total;
+				} else {
+					statusProgress.removeAttribute('value');
+					statusProgress.removeAttribute('max');
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
 	}
 }());
 		</script>
 	</body>
 </html>
-
