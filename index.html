@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
 		<script src="coi-serviceworker.js"></script>
 		<title>Ultrapool</title>
 		<style>
@@ -139,7 +139,7 @@ const buffers = [];
 let total = 0;
 for (const part of parts) {
 const partResp = await nativeFetch(dir + part, init);
-if (!partResp.ok) throw new Error(Missing chunk  for );
+if (!partResp.ok) throw new Error(`Missing chunk ${part} for ${fileName}`);
 const buf = await partResp.arrayBuffer();
 total += buf.byteLength;
 buffers.push(new Uint8Array(buf));
@@ -271,4 +271,3 @@ const engine = new Engine(GODOT_CONFIG);
 		</script>
 	</body>
 </html>
-
