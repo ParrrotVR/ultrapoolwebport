@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		
 		<script src="coi-serviceworker.js"></script>
 		<title>Ultrapool</title>
 		<style>
@@ -112,63 +112,60 @@ body {
 
 		<script>
 const CHUNKED_FILES = {
-	"index2.pck": [
-		"index2.pck.part000","index2.pck.part001","index2.pck.part002","index2.pck.part003","index2.pck.part004",
-		"index2.pck.part005","index2.pck.part006","index2.pck.part007","index2.pck.part008","index2.pck.part009"
-	],
-	"index2.wasm": ["index2.wasm.part000","index2.wasm.part001"]
+"index2.pck": ["index2.pck.part000","index2.pck.part001","index2.pck.part002","index2.pck.part003","index2.pck.part004","index2.pck.part005","index2.pck.part006","index2.pck.part007","index2.pck.part008","index2.pck.part009"],
+"index2.wasm": ["index2.wasm.part000","index2.wasm.part001"]
 };
 
 (function () {
-	const nativeFetch = window.fetch.bind(window);
+const nativeFetch = window.fetch.bind(window);
 
-	function toUrlString(resource) {
-		if (typeof resource === 'string') return resource;
-		if (resource instanceof URL) return resource.toString();
-		if (resource && typeof resource.url === 'string') return resource.url;
-		return '';
-	}
+function toUrlString(resource) {
+if (typeof resource === 'string') return resource;
+if (resource instanceof URL) return resource.toString();
+if (resource && typeof resource.url === 'string') return resource.url;
+return '';
+}
 
-	window.fetch = async function (resource, init) {
-		const requestUrl = toUrlString(resource);
-		const stripped = requestUrl.split('#')[0].split('?')[0];
-		const slash = stripped.lastIndexOf('/');
-		const dir = slash >= 0 ? stripped.slice(0, slash + 1) : '';
-		const fileName = slash >= 0 ? stripped.slice(slash + 1) : stripped;
-		const parts = CHUNKED_FILES[fileName];
-		if (!parts) return nativeFetch(resource, init);
+window.fetch = async function (resource, init) {
+const requestUrl = toUrlString(resource);
+const stripped = requestUrl.split('#')[0].split('?')[0];
+const slash = stripped.lastIndexOf('/');
+const dir = slash >= 0 ? stripped.slice(0, slash + 1) : '';
+const fileName = slash >= 0 ? stripped.slice(slash + 1) : stripped;
+const parts = CHUNKED_FILES[fileName];
+if (!parts) return nativeFetch(resource, init);
 
-		const buffers = [];
-		let total = 0;
-		for (const part of parts) {
-			const partResp = await nativeFetch(dir + part, init);
-			if (!partResp.ok) throw new Error(`Missing chunk ${part} for ${fileName}`);
-			const buf = await partResp.arrayBuffer();
-			total += buf.byteLength;
-			buffers.push(new Uint8Array(buf));
-		}
+const buffers = [];
+let total = 0;
+for (const part of parts) {
+const partResp = await nativeFetch(dir + part, init);
+if (!partResp.ok) throw new Error(Missing chunk  for );
+const buf = await partResp.arrayBuffer();
+total += buf.byteLength;
+buffers.push(new Uint8Array(buf));
+}
 
-		const merged = new Uint8Array(total);
-		let offset = 0;
-		for (const b of buffers) {
-			merged.set(b, offset);
-			offset += b.byteLength;
-		}
+const merged = new Uint8Array(total);
+let offset = 0;
+for (const b of buffers) {
+merged.set(b, offset);
+offset += b.byteLength;
+}
 
-		return new Response(merged, {
-			status: 200,
-			statusText: 'OK',
-			headers: {
-				'Content-Type': 'application/octet-stream',
-				'Content-Length': String(total),
-			},
-		});
-	};
+return new Response(merged, {
+status: 200,
+statusText: 'OK',
+headers: {
+'Content-Type': 'application/octet-stream',
+'Content-Length': String(total),
+},
+});
+};
 }());
-		</script>
+</script>
 		<script src="index2.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index2","experimentalVK":false,"fileSizes":{"index2.pck":227754604,"index2.wasm":35739700},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index2","experimentalVK":false,"fileSizes":{"index2.pck":233172396,"index2.wasm":35739700},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -274,3 +271,4 @@ const engine = new Engine(GODOT_CONFIG);
 		</script>
 	</body>
 </html>
+
