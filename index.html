@@ -216,9 +216,12 @@ const engine = new Engine(GODOT_CONFIG);
 					console.log(message);
 				});
 
+				console.log('Files loaded, setting up interception...');
+				
 				// Set up fetch interception BEFORE starting the game
 				const originalFetch = window.fetch;
 				window.fetch = function(url, options) {
+					console.log('Fetch called for:', url);
 					if (url.endsWith('index.pck')) {
 						console.log('Intercepting PCK file request');
 						return Promise.resolve(new Response(pckData, {
@@ -236,6 +239,12 @@ const engine = new Engine(GODOT_CONFIG);
 					return originalFetch(url, options);
 				};
 
+				// Test the interception
+				console.log('Testing fetch interception...');
+				window.fetch('index.wasm').then(response => {
+					console.log('Test WASM fetch successful, size:', response.arrayBuffer().then(b => console.log('Size:', b.byteLength)));
+				}).catch(e => console.log('Test fetch error:', e));
+
 				// Also inject PCK into Godot's file system
 				const originalPreRun = engine.preRun || (() => {});
 				engine.preRun = () => {
@@ -246,6 +255,7 @@ const engine = new Engine(GODOT_CONFIG);
 					originalPreRun();
 				};
 				
+				console.log('Starting game...');
 				setStatusNotice('Starting game...');
 				engine.startGame({
 					'onProgress': function (current, total) {
