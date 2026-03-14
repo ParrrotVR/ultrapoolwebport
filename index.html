@@ -203,10 +203,6 @@ const engine = new Engine(GODOT_CONFIG);
 		// Initialize chunk loader
 		const chunkLoader = new FileChunkLoader();
 		
-		// Override Godot's file loading to use chunked files
-		const originalFS = FS;
-		let loadedFiles = {};
-		
 		async function loadGameFiles() {
 			try {
 				// Load PCK file
@@ -225,21 +221,23 @@ const engine = new Engine(GODOT_CONFIG);
 					statusProgress.max = 100;
 				});
 				
-				// Store loaded data
-				loadedFiles = {
-					'index.pck': pckData,
-					'index.wasm': wasmData
-				};
+				// Create blob URLs for the loaded files
+				const pckBlob = new Blob([pckData], { type: 'application/octet-stream' });
+				const wasmBlob = new Blob([wasmData], { type: 'application/wasm' });
 				
-				// Override Godot's file system
-				window.FS = {
-					...originalFS,
-					readFile: function(path) {
-						if (loadedFiles[path]) {
-							return loadedFiles[path];
-						}
-						return originalFS.readFile ? originalFS.readFile(path) : null;
+				const pckUrl = URL.createObjectURL(pckBlob);
+				const wasmUrl = URL.createObjectURL(wasmBlob);
+				
+				// Override Godot's file loading by intercepting fetch calls
+				const originalFetch = window.fetch;
+				window.fetch = function(url, options) {
+					if (url.endsWith('index.pck')) {
+						return Promise.resolve(new Response(pckData));
 					}
+					if (url.endsWith('index.wasm')) {
+						return Promise.resolve(new Response(wasmData));
+					}
+					return originalFetch(url, options);
 				};
 				
 				// Start the game with custom progress
@@ -255,6 +253,9 @@ const engine = new Engine(GODOT_CONFIG);
 						}
 					},
 				}).then(() => {
+					// Clean up blob URLs
+					URL.revokeObjectURL(pckUrl);
+					URL.revokeObjectURL(wasmUrl);
 					setStatusMode('hidden');
 				}, displayFailureNotice);
 				
