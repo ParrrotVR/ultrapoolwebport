@@ -204,7 +204,47 @@ const engine = new Engine(GODOT_CONFIG);
 		async function startGame() {
 			try {
 				setStatusNotice('Setting up game files...');
-				await chunkLoader.setupGodotFS(engine);
+				
+				// Load both PCK and WASM files first
+				console.log('Loading PCK file...');
+				const pckData = await chunkLoader.loadChunkedFile('index.manifest.json', (progress, message) => {
+					console.log(message);
+				});
+
+				console.log('Loading WASM file...');
+				const wasmData = await chunkLoader.loadChunkedFile('index.wasm.manifest.json', (progress, message) => {
+					console.log(message);
+				});
+
+				// Set up fetch interception BEFORE starting the game
+				const originalFetch = window.fetch;
+				window.fetch = function(url, options) {
+					if (url.endsWith('index.pck')) {
+						console.log('Intercepting PCK file request');
+						return Promise.resolve(new Response(pckData, {
+							status: 200,
+							headers: { 'Content-Type': 'application/octet-stream' }
+						}));
+					}
+					if (url.endsWith('index.wasm')) {
+						console.log('Intercepting WASM file request');
+						return Promise.resolve(new Response(wasmData, {
+							status: 200,
+							headers: { 'Content-Type': 'application/wasm' }
+						}));
+					}
+					return originalFetch(url, options);
+				};
+
+				// Also inject PCK into Godot's file system
+				const originalPreRun = engine.preRun || (() => {});
+				engine.preRun = () => {
+					if (typeof engine.FS !== 'undefined' && engine.FS.writeFile) {
+						engine.FS.writeFile('/index.pck', pckData);
+						console.log('PCK file injected into Godot file system');
+					}
+					originalPreRun();
+				};
 				
 				setStatusNotice('Starting game...');
 				engine.startGame({
