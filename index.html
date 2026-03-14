@@ -93,7 +93,7 @@ body {
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
 		<script src="coi-serviceworker.js"></script>
-		<script src="file-chunk-loader.js"></script>
+		<script src="godot-chunk-loader.js"></script>
 		<script src="index.js"></script>
 		<canvas id="canvas">
 			Your browser does not support the canvas tag.
@@ -109,7 +109,6 @@ body {
 			<div id="status-notice"></div>
 		</div>
 
-		<script src="index.js"></script>
 		<script>
 const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":222337000,"index.wasm":35739700},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
@@ -200,47 +199,14 @@ const engine = new Engine(GODOT_CONFIG);
 	} else {
 		setStatusMode('progress');
 		
-		// Initialize chunk loader
-		const chunkLoader = new FileChunkLoader();
+		const chunkLoader = new GodotChunkLoader();
 		
-		async function loadGameFiles() {
+		async function startGame() {
 			try {
-				// Load PCK file
-				setStatusNotice('Loading game data...');
-				const pckData = await chunkLoader.loadFileWithFallback('index.pck', (progress, message) => {
-					setStatusNotice(message);
-					statusProgress.value = progress;
-					statusProgress.max = 100;
-				});
+				setStatusNotice('Setting up game files...');
+				await chunkLoader.setupGodotFS(engine);
 				
-				// Load WASM file  
-				setStatusNotice('Loading game engine...');
-				const wasmData = await chunkLoader.loadFileWithFallback('index.wasm', (progress, message) => {
-					setStatusNotice(message);
-					statusProgress.value = progress;
-					statusProgress.max = 100;
-				});
-				
-				// Create blob URLs for the loaded files
-				const pckBlob = new Blob([pckData], { type: 'application/octet-stream' });
-				const wasmBlob = new Blob([wasmData], { type: 'application/wasm' });
-				
-				const pckUrl = URL.createObjectURL(pckBlob);
-				const wasmUrl = URL.createObjectURL(wasmBlob);
-				
-				// Override Godot's file loading by intercepting fetch calls
-				const originalFetch = window.fetch;
-				window.fetch = function(url, options) {
-					if (url.endsWith('index.pck')) {
-						return Promise.resolve(new Response(pckData));
-					}
-					if (url.endsWith('index.wasm')) {
-						return Promise.resolve(new Response(wasmData));
-					}
-					return originalFetch(url, options);
-				};
-				
-				// Start the game with custom progress
+				setStatusNotice('Starting game...');
 				engine.startGame({
 					'onProgress': function (current, total) {
 						if (current > 0 && total > 0) {
@@ -253,19 +219,15 @@ const engine = new Engine(GODOT_CONFIG);
 						}
 					},
 				}).then(() => {
-					// Clean up blob URLs
-					URL.revokeObjectURL(pckUrl);
-					URL.revokeObjectURL(wasmUrl);
 					setStatusMode('hidden');
 				}, displayFailureNotice);
-				
 			} catch (error) {
-				console.error('Error loading game files:', error);
-				displayFailureNotice('Failed to load game files: ' + error.message);
+				console.error('Error setting up game:', error);
+				displayFailureNotice('Failed to setup game: ' + error.message);
 			}
 		}
 		
-		loadGameFiles();
+		startGame();
 	}
 }());
 		</script>
