@@ -1,6 +1,8 @@
 class GodotChunkLoader {
     constructor() {
         this.cache = new Map();
+        this.pckData = null;
+        this.wasmData = null;
     }
 
     async loadChunkedFile(manifestUrl, progressCallback) {
@@ -63,27 +65,43 @@ class GodotChunkLoader {
 
     async setupGodotFS(engine) {
         try {
-            const pckData = await this.loadChunkedFile('index.manifest.json', (progress, message) => {
+            // Load both PCK and WASM files
+            console.log('Loading PCK file...');
+            this.pckData = await this.loadChunkedFile('index.manifest.json', (progress, message) => {
                 console.log(message);
             });
 
-            // Override the engine's preRun to inject the PCK file into Godot's file system
+            console.log('Loading WASM file...');
+            this.wasmData = await this.loadChunkedFile('index.wasm.manifest.json', (progress, message) => {
+                console.log(message);
+            });
+
+            // Intercept fetch calls to return our loaded data
+            const originalFetch = window.fetch;
+            window.fetch = function(url, options) {
+                if (url.endsWith('index.pck')) {
+                    console.log('Intercepting PCK file request');
+                    return Promise.resolve(new Response(this.pckData, {
+                        status: 200,
+                        headers: { 'Content-Type': 'application/octet-stream' }
+                    }));
+                }
+                if (url.endsWith('index.wasm')) {
+                    console.log('Intercepting WASM file request');
+                    return Promise.resolve(new Response(this.wasmData, {
+                        status: 200,
+                        headers: { 'Content-Type': 'application/wasm' }
+                    }));
+                }
+                return originalFetch(url, options);
+            }.bind(this);
+
+            // Also inject PCK into Godot's file system if available
             const originalPreRun = engine.preRun || (() => {});
             engine.preRun = () => {
-                // Wait for Godot's file system to be available
                 if (typeof engine.FS !== 'undefined' && engine.FS.writeFile) {
-                    engine.FS.writeFile('/index.pck', pckData);
+                    engine.FS.writeFile('/index.pck', this.pckData);
                     console.log('PCK file injected into Godot file system');
-                } else {
-                    // If FS isn't ready yet, try again after a short delay
-                    setTimeout(() => {
-                        if (typeof engine.FS !== 'undefined' && engine.FS.writeFile) {
-                            engine.FS.writeFile('/index.pck', pckData);
-                            console.log('PCK file injected into Godot file system (delayed)');
-                        } else {
-                            console.warn('Godot FS not available, PCK file may not be loaded correctly');
-                        }
-                    }, 100);
                 }
                 originalPreRun();
             };
